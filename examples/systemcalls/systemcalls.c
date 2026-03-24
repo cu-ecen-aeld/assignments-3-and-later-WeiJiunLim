@@ -1,5 +1,21 @@
 #include "systemcalls.h"
 
+/* for system() */
+#include <stdlib.h>
+
+/* for pid_t*/
+#include <sys/types.h>
+
+/* for waitpid() */
+#include <sys/wait.h>
+
+/* for execv() */
+#include <unistd.h>
+
+/* for open() */
+#include <fcntl.h>
+#include <sys/stat.h>
+
 /**
  * @param cmd the command to execute with system()
  * @return true if the command in @param cmd was executed
@@ -17,7 +33,9 @@ bool do_system(const char *cmd)
  *   or false() if it returned a failure
 */
 
-    return true;
+    int result = system(cmd);
+
+    return ((result == 0) ? true : false);
 }
 
 /**
@@ -47,7 +65,7 @@ bool do_exec(int count, ...)
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
     // and may be removed
-    command[count] = command[count];
+    // command[count] = command[count];
 
 /*
  * TODO:
@@ -59,9 +77,62 @@ bool do_exec(int count, ...)
  *
 */
 
+    pid_t pid;
+    bool result = false;
+
+    /* Create a child process using fork() */
+    pid = fork();
+
+    if (pid == -1) {
+
+        /* The fork() failed */
+        result = false;
+    }
+    else if (pid == 0) {
+
+        /* The fork() succeeded, and this is the child process running */
+
+        /* Call execv to replace the child process with the new program.
+         * If the execv is successful, it will not return here */
+        execv(command[0], command);
+
+        /* If we are here, the execv has failed */
+        result = false;
+        _exit(EXIT_FAILURE); 
+    }
+    else {
+
+        /* The fork() succeeded, and this is the parent process running */
+
+        int status;
+
+        /* Wait for the child process to complete */
+        if (waitpid(pid, &status, 0) == -1) {
+            /* There has been a waitpid error */
+            result = false;
+        }
+        else {
+            /* The child process has completed. */
+
+            /* Check child process execution status*/
+            if (WIFEXITED(status)) {
+
+                int exit_status = WEXITSTATUS(status);
+
+                if (exit_status == EXIT_FAILURE) {
+                    result = false;
+                }
+                else {
+                    result = true; 
+                }
+            }             
+        }
+
+    }
+
     va_end(args);
 
-    return true;
+    return (result);
 }
 
 /**
@@ -82,7 +153,7 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
     // and may be removed
-    command[count] = command[count];
+    // command[count] = command[count];
 
 
 /*
@@ -93,7 +164,80 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *
 */
 
+    pid_t pid;
+    bool result = false;
+    int fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
+
+    if (fd < 0) { 
+        /* File open error */
+        result = false;
+    }
+    else {
+
+        /* Create a child process using fork() */
+        pid = fork();
+
+        if (pid == -1) {
+
+            /* The fork() failed */
+            result = false;
+        }
+        else if (pid == 0) {
+
+            /* The fork() succeeded, and this is the child process running */
+
+            /* Duplicate file descriptor for child's use */
+            if (dup2(fd, 1) < 0) {
+                /* Duplicate file descriptor failed */
+                result = false;
+                _exit(EXIT_FAILURE); 
+            }
+
+            /* Close file descriptor */
+            close(fd);
+
+            /* Call execv to replace the child process with the new program.
+            * If the execv is successful, it will not return here */
+            execv(command[0], command);
+
+            /* If we are here, the execv has failed */
+            result = false;
+            _exit(EXIT_FAILURE); 
+        }
+        else {
+
+            /* The fork() succeeded, and this is the parent process running */
+
+            int status;
+
+            /* Wait for the child process to complete */
+            if (waitpid(pid, &status, 0) == -1) {
+                /* There has been a waitpid error */
+                result = false;
+            }
+            else {
+                /* The child process has completed. */
+
+                /* Check child process execution status*/
+                if (WIFEXITED(status)) {
+
+                    int exit_status = WEXITSTATUS(status);
+
+                    if (exit_status == EXIT_FAILURE) {
+                        result = false;
+                    }
+                    else {
+                        result = true; 
+                    }
+                }             
+            }
+
+            /* Close file descriptor */
+            close(fd);
+        }
+    }
+
     va_end(args);
 
-    return true;
+    return (result);
 }
