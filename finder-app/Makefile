@@ -9,6 +9,11 @@
 #        make CROSS_COMPILE=aarch64-none-linux-gnu-
 CC = $(CROSS_COMPILE)gcc
 
+.PHONY: all clean
+
+# Default build
+all: writer
+
 # Create writer application from writer object
 writer: writer.o
 	$(CC) writer.o -o writer
@@ -18,6 +23,5 @@ writer.o : writer.c
 	$(CC) -c writer.c -o writer.o
 
 # Clean writer application and writer object
-.PHONY: clean
 clean:
 	rm -f writer writer.o
